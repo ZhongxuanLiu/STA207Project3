@@ -20,6 +20,10 @@ library(tidyverse)
 library(ggplot2)
 library(gridExtra)
 library(FlexParamCurve)
+library(plotly)
+library(gplots)
+library(lme4)
+library(data.table)
 covid <- read_csv("https://covid19.who.int/WHO-COVID-19-global-data.csv")
 ```
 
@@ -48,7 +52,7 @@ In this part, we draw two interactive plots of new cases and new deaths by the r
 | WPRO  | WHO Regional Office for the Western Pacific |
 Other regions that aren't contained in the WHO_region are counted in "Other" group. The rank of new cases by WHO_region are AMRO, EURO, SEARO, EMRO, AFRO, WPRO and Other. Americas has the most people infected across these 6 regions(exclude “Other”). EMRO has the smallest infected people across these 6 regions(exclude “Other”).  
 
-Since we are concentrate on the growth rate on USA, so we also draw a interactive plot of new cases by day. The plot of new cases by day in USA and the analogous plot of the whole world show the similar trend on new cases. We also talk a look of the trend of new cases in India, Australia, UK and Ethiopia. UK has the similar trend as the analogous plot of the whole world. The new cases in India by reported date shows approximately symmetric and the number of new cases get highest value in the fall of 2020. In Australia, there have been two notable outbreaks of the epidemic in the spring of 2020 and the fall of 2020. As for Ethiopia, the number of new cases get high in Sep 2020 and Mar 2021. 
+Since we are concentrating on the growth rate in the USA, we also draw an interactive plot of new cases by day. The plot of new cases by day in the USA and the analogous plot of the whole world show the similar trend on new cases. We also take a look at the trend of new cases in China and the UK. The UK has a similar trend as well. However, in China, the number of new cases is high at the beginning, much less new cases were reported after May 2020. 
 
 ```{r}
 # summarise by date
@@ -138,7 +142,81 @@ $$
 \frac{New Cases in Day i}{Cumulative Cases in Day i-1}
 $$
 
-Then, we collect information on several different common policy responses from [The Oxford COVID-19 Government Response Tracker (OxCGRT)](https://www.bsg.ox.ac.uk/research/research-projects/covid-19-government-response-tracker). In this data, we focus on the date when governments implemented national restrictions on internal movement between cities/regions. And we calculate the increase rate of ten days before and after the date of lockdown to investigate if lockdown could control the increase of cases of covid-19.
+Then, we collect information on several different common policy responses from [The Oxford COVID-19 Government Response Tracker (OxCGRT)](https://www.bsg.ox.ac.uk/research/research-projects/covid-19-government-response-tracker). In this data, we focus on the date when governments implemented national restrictions on internal movement between cities/regions. And we calculate the increase rate of ten days before and after the date of lockdown to investigate if lockdown could control the increase of cases of covid-19. The interaction term of the full model is not significant, therefore we drop it and are left with an additive model.
+$$Y_{ijk} = \mu_{\cdot\cdot} + \alpha_i+\beta_j +\epsilon_{ijk}$$, where the total number of observations is k = 1,..., 40, the lockdown status are i = 0 (no lockdown), 1 (lockdown), and j's denote the 106 country codes. The constraints are (i)$\sum\alpha_i=0$, (ii)$\sum\beta_j=0$, (iii)$\epsilon_{ijk}$ follows $N(0,\sigma^2)$.
+The model assumptions are that the residuals follow a normal distribution and have equal variances.
+
+```{r}
+covid$WHO_region<-as.factor(covid$WHO_region)
+```
+
+
+```{r}
+#causal inference
+data3<-read_csv("data_c.csv",col_names = T)
+data3f<-read_csv("data_c1.csv",col_names = T)
+colnames(data3f)[1]<-"country_code"
+colnames(data3)[1]<-"country_code"
+sumn<-function(x){
+  return (sum(x,na.rm=T))
+}
+data3f$days<-apply(data3f[,3:431],1,sumn)
+pos<-function(x){
+  return (which(x==2))
+}
+data3_pos<-apply(data3[,3:431],1,pos)
+names(data3_pos)<-1:186
+data3_pos1<-sapply(data3_pos,length)
+data3_pos1<-data3_pos1[which(data3_pos1>=22)]
+data3_pos<-data3[as.integer(names(data3_pos1)),]
+posq<-function(x){
+  return (which(x==2)[1])
+}
+pos1<-apply(data3_pos[,3:431],1,posq)
+date<-colnames(data3_pos)[pos1]
+Sys.setlocale("LC_TIME", "C")
+date<-as.Date(date,"%d-%b-%y")
+date<-data.frame(country_code=data3_pos$country_code,date=date)
+library(countrycode)
+library(ISOcodes)
+covid_<-covid
+covid_$country_code<-countrycode(covid$Country,origin = "country.name",destination = "iso3c",warn = TRUE)
+c<-c(integer(0))
+for (i in 1:153){
+  c<-c(c,which(covid_$country_code==data3_pos$country_code[i]))
+  
+}
+covid_<-covid_[c,]
+newd<-inner_join(covid_, data3_pos, by = "country_code")
+newd<-inner_join(newd,date, by = "country_code")
+newd<-newd[,c(1:10,440)]
+day<-newd[seq(1,64904,by=427),]$date
+code<-unique(newd$country_code)
+data4<-data.frame(integer(0))
+for (i in 1:152){
+covid_temp<-filter(newd,country_code==code[i])
+covid_temp_un<-filter(covid_temp,as.Date(day[i])-10<=Date_reported,Date_reported<=day[i])
+covid_temp_lo<-filter(covid_temp,day[i]<=Date_reported,Date_reported<=as.Date(day[i])+10)
+covid_temp_un$rate<-c(NA,covid_temp_un$New_cases[2:11]/covid_temp_un$Cumulative_cases[1:10])
+covid_temp_lo$rate<-c(NA,covid_temp_lo$New_cases[2:11]/covid_temp_lo$Cumulative_cases[1:10])
+covid_temp_un$status<-rep(0,11)
+covid_temp_lo$status<-rep(1,11)
+temp1<-as.data.frame(rbind(covid_temp_un[2:11,],covid_temp_lo[2:11,]))
+data4<-as.data.frame(rbind(data4,temp1))
+}
+```
+
+```{r}
+pos2<-which(is.nan(data4$rate)|is.infinite(data4$rate))
+data4<-filter(data4,!(country_code%in%unique(data4$country_code[pos2])))
+data4$status<-as.factor(data4$status)
+data4$country_code<-as.factor(data4$country_code)
+full<-aov(rate~status+country_code+status:country_code,data=data4)
+summary(full)#interaction not significant, remove it
+fit3<-aov(rate~status+country_code,data=data4)
+summary(fit3)
+```
+At significance level 0.05, the main effects country and lockdown status are significant, meaning there exists differences in rate of increasing cases between different lockdown status and between different countries, since their p-values < 0.05. 
 
 ## Growth Models
 
@@ -296,7 +374,7 @@ In this project, we explored the development trend of cumulative cases of COVID-
 # Contribution {-}
 
 - Jiongqi Zhao:
-- Jiawen Liu: Descriptive Analysis, Introduction
+- Jiawen Liu:
 - Zhongxuan Liu: Growth Models, Model diagnostics, Code and Format Integration
 - Chenze Li: 
 
