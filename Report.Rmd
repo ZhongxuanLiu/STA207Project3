@@ -296,7 +296,7 @@ In this project, we explored the development trend of cumulative cases of COVID-
 # Contribution {-}
 
 - Jiongqi Zhao:
-- Jiawen Liu:
+- Jiawen Liu: Descriptive Analysis, Introduction
 - Zhongxuan Liu: Growth Models, Model diagnostics, Code and Format Integration
 - Chenze Li: 
 
