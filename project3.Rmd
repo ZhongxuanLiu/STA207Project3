@@ -16,8 +16,8 @@ covid$WHO_region<-as.factor(covid$WHO_region)
 
 ```{r}
 #causal inference
-data3<-read_csv("C:/Users/Tony Li/Desktop/data_c.csv",col_names = T)
-data3f<-read_csv("C:/Users/Tony Li/Desktop/data_c1.csv",col_names = T)
+data3<-read_csv("../data_c.csv",col_names = T)
+data3f<-read_csv("../data_c1.csv",col_names = T)
 colnames(data3f)[1]<-"country_code"
 colnames(data3)[1]<-"country_code"
 sumn<-function(x){
