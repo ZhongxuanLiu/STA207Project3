@@ -1,0 +1,105 @@
+---
+title: "STA207-Project3"
+author: "Jiawen Liu"
+date: "3/1/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Introduction
+In 2019, a worldwide outbreak of COVID-19 happened and it caused widespread panic across the whole world. The dataset we used in this project is from the World Health Organization(WHO). The original dataset "covid" contains 8 variables. In these 8 variables, "Date_reported" is the reported date of other variables ,"Country_code", "Country" and "WHO_region" are qualitative variables, others are quantitative variables. 
+
+# Load the dataset and packages
+```{r global_options, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(plotly)
+library(gplots)
+library(lme4)
+library(data.table)
+covid <- read_csv("~/Desktop/Courses/UC Davis/2021winter/207/WHO-COVID-19-global-data.csv")
+pop.density <- read.csv("~/Desktop/Courses/UC Davis/2021winter/207/covid-19-death-rate-vs-population-density.csv")
+develop.code <- read.csv("~/Desktop/Courses/UC Davis/2021winter/207/country-codes.csv")
+```
+
+# Descriptive 
+In this part, we draw two interactive plots of new cases and new deaths by reported date. These two plots show the trend of new cases and new deaths clearly. The number of new infected persons have peaked around January 2021, same as new deaths. The bar plot is made by WHO_region on new cases. There are total 6 regions in WHO Member States:
+
+| WHO_region   | Whole name |
+| ----------- | ----------- |
+| AFRO  | WHO Regional Office for Africa |
+| AMRO  | WHO Regional Office for the Americas |
+| EMRO  | WHO Regional Office for the Eastern Mediterranean |
+| EURO  | WHO Regional Office for Europe |
+| SEARO | WHO Regional Office for South-East Asia |
+| WPRO  | WHO Regional Office for the Western Pacific |
+Other regions that don't contain in WHO_region are count in "Other" group. The rank of new cases by WHO_region are AMRO, EURO, SEARO, EMRO, AFRO, WPRO and Other. Americas has the most people got infected across these 6 regions(exclude Other). EMRO has the smallest infected people across these 6 regions(exclude Other).  
+
+Since we are concentrate on the growth rate on USA, so we also draw a interactive plot of new cases by day. The plot of new cases by day in USA and the analogous plot of the whole world show the similar trend on new cases. 
+
+# Descriptive Analysis
+```{r}
+# summarise by date
+covid_date <- covid %>% 
+  mutate(avg_new_cases = stats::filter(New_cases, rep(1/7, 7), sides = 1),
+         avg_new_deaths = stats::filter(New_deaths, rep(1/7, 7), sides = 1)) %>% 
+  group_by(Date_reported) %>% 
+  summarise(sum_new_cases = sum(New_cases),
+            sum_new_deaths = sum(New_deaths),
+            sum_avg_new_cases = sum(avg_new_cases),
+            sum_avg_new_deaths = sum(avg_new_deaths))
+p1 <- plot_ly(data = covid_date, x = ~ Date_reported, y = ~ sum_new_cases, type = "bar", name = "new cases")
+add_paths(p1, x = covid_date$Date_reported, y = covid_date$sum_avg_new_cases, name = "7 day average")
+
+p2 <- plot_ly(data = covid_date, x = ~ Date_reported, y = ~ sum_new_deaths, type = "bar", name = "new deaths")
+add_paths(p2, x = covid_date$Date_reported, y = covid_date$sum_avg_new_deaths, name = "7 day average")
+
+# summarise by country
+covid_country <- covid %>% 
+  mutate(avg_new_cases = stats::filter(New_cases, rep(1/7, 7), sides = 1),
+         avg_new_deaths = stats::filter(New_deaths, rep(1/7, 7), sides = 1)) %>% 
+  group_by(Country_code) %>% 
+  summarise(sum_new_cases = sum(New_cases),
+            sum_new_deaths = sum(New_deaths),
+            sum_avg_new_cases = sum(avg_new_cases),
+            sum_avg_new_deaths = sum(avg_new_deaths)) %>% 
+  arrange(desc(sum_new_cases))
+
+head(covid_country)
+
+# summarise by region
+covid_region <- covid %>% 
+  mutate(avg_new_cases = stats::filter(New_cases, rep(1/7, 7), sides = 1),
+         avg_new_deaths = stats::filter(New_deaths, rep(1/7, 7), sides = 1)) %>% 
+  group_by(WHO_region) %>% 
+  summarise(sum_new_cases = sum(New_cases),
+            sum_new_deaths = sum(New_deaths),
+            sum_avg_new_cases = sum(avg_new_cases),
+            sum_avg_new_deaths = sum(avg_new_deaths))
+
+
+ggplot(covid_region, aes(x=factor(WHO_region, levels = c("AFRO", "AMRO", "EMRO",  "EURO", "SEARO", "WPRO", "Other")), y=sum_new_cases, group = 1)) + geom_point(aes(color = WHO_region)) + geom_line(color = "grey") + xlab("WHO_region")
+
+ggplot(covid_region, aes(x = factor(WHO_region, levels = c("Other", "AFRO", "AMRO", "EMRO",  "EURO", "SEARO", "WPRO")),y=sum_new_cases, fill = WHO_region)) + 
+  geom_bar(stat="identity") + coord_flip()
+
+covid_WHO <- covid %>% 
+  mutate(avg_new_cases = stats::filter(New_cases, rep(1/7, 7), sides = 1),
+         avg_new_deaths = stats::filter(New_deaths, rep(1/7, 7), sides = 1)) %>% 
+  group_by(Date_reported, WHO_region) %>% 
+  summarise(sum_c_cases = sum(Cumulative_cases),
+            sum_c_deaths = sum(Cumulative_deaths)) %>% 
+  filter(WHO_region == "EURO")
+
+
+# America
+covid_America <- covid %>% 
+  mutate(avg_new_cases = stats::filter(New_cases, rep(1/7, 7), sides = 1),
+         avg_new_deaths = stats::filter(New_deaths, rep(1/7, 7), sides = 1)) %>% 
+  filter(Country == "United States of America")
+
+p3 <- plot_ly(data = covid_date, x = ~ Date_reported, y = ~ sum_new_cases, type = "bar", name = "new cases")
+```
