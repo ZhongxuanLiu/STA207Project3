@@ -1,0 +1,251 @@
+---
+title: "Statistical Data Analysis On WHO Covid-19 data"
+author: "Team 4"
+date: "3/4/2021"
+output:
+  html_document:
+    toc: true
+    toc_float: 
+      collapsed: false
+      smooth_scroll: false
+    df_print: paged
+    number_sections: yes
+    code_folding: hide
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(FlexParamCurve)
+covid <- read_csv("https://covid19.who.int/WHO-COVID-19-global-data.csv")
+```
+
+# Introduction
+
+In 2019, a worldwide outbreak of COVID-19 happened and it caused widespread panic across the whole world. “As the world races to find a vaccine or a treatment to combat the pandemic, many concerns arise about the outbreak severity, particularly the potential number of infected people. Hence, it is of great importance to estimate the outbreak evolution using related statistical models.” We have two questions of interest, whether the lockdown has effectively controled the increasing rate of new cases of covid-19, and what the development trend curve of the pandemic looks like. The main dataset we used in this project is from the World Health Organization (WHO). In order to better answer the first question of interest, we used an additional lockdown status dataset which describes when countries have lockdowns during the pandemic. The WHO dataset "covid" contains 8 variables. In these 8 variables, `Date_reported` is the reported date of other variables, `Country_code`, `Country` and `WHO_region` are qualitative variables, `New_cases`, `Cumulative_cases`, `New_deaths`, and `Cumulative_deaths` are quantitative variables. As for the second question, We would like to know what the development trend of cumulative cases of the pandemic is like. We proposed two ordinary differential equation models to fit the cumulative cases. 
+
+
+
+# Background of COVID-19
+
+In late December of 2019, a contagious Coronavirus disease 2019 (COVID-19) caused by severe acute respiratory syndrome coronavirus 2 (SARS-Cov-2) was found in Wuhan, China. It then spread to the other countries rapidly, eventually becoming a worldwide pandemic. The symptoms of the disease are different by people, including but not limited to cough, fever, and loss of smell and taste. 
+
+
+
+# Descriptive Analysis
+In this part, we draw two interactive plots of new cases and new deaths by the reported date. These two plots show the trend of new cases and new deaths clearly. The number of new infected persons have peaked around January 2021, same as new deaths. The bar plot is made by WHO_region on new cases. There are total 6 regions in WHO Member States:
+
+| WHO_region   | Whole name |
+| ----------- | ----------- |
+| AFRO  | WHO Regional Office for Africa |
+| AMRO  | WHO Regional Office for the Americas |
+| EMRO  | WHO Regional Office for the Eastern Mediterranean |
+| EURO  | WHO Regional Office for Europe |
+| SEARO | WHO Regional Office for South-East Asia |
+| WPRO  | WHO Regional Office for the Western Pacific |
+Other regions that aren't contained in the WHO_region are counted in "Other" group. The rank of new cases by WHO_region are AMRO, EURO, SEARO, EMRO, AFRO, WPRO and Other. Americas has the most people infected across these 6 regions(exclude “Other”). EMRO has the smallest infected people across these 6 regions(exclude “Other”).  
+
+Since we are concentrating on the growth rate in the USA, we also draw an interactive plot of new cases by day. The plot of new cases by day in the USA and the analogous plot of the whole world show the similar trend on new cases. We also take a look at the trend of new cases in China and the UK. The UK has a similar trend as well. However, in China, the number of new cases is high at the beginning, much less new cases were reported after May 2020. 
+
+
+
+# Inference Analysis
+
+## ANOVA Model
+
+We use a two-way ANOVA model for the first question of interest. First, we need a variable to represent the increase of cumulative cases of covid-19, and we assume that the number of cumulative cases is positively related to the number of new cases the next day which means in the region with larger number of cases, the number of new cases tend to be larger the next day. Therefore, we use percentage change(or we call it increase rate) of one day to represent the increase speed of cases of covid-19. For Day $i$, the present change is defined as:
+$$
+\frac{New Cases in Day i}{Cumulative Cases in Day i-1}
+$$
+
+Then, we collect information on several different common policy responses from [The Oxford COVID-19 Government Response Tracker (OxCGRT)](https://www.bsg.ox.ac.uk/research/research-projects/covid-19-government-response-tracker). In this data, we focus on the date when governments implemented national restrictions on internal movement between cities/regions. And we calculate the increase rate of ten days before and after the date of lockdown to investigate if lockdown could control the increase of cases of covid-19.
+
+## Growth Models
+
+To model the relationship of the cumulative cases with time, we proposed two logistic type of growth models, both of which are ordinary differential equation models and are very common to simulate the development process of an infectious dieases.
+
+- Classic Logistic growing Model (CLM)
+
+\begin{equaltion}
+    \dfrac{\mathrm{d}C(t)}{\mathrm{d}t} = rC(t)\left(1-\dfrac{C(t)}{K} \right)
+\end{equaltion}
+
+- Generalized Richards model (GRM)
+
+\begin{equaltion}
+    \dfrac{\mathrm{d}C(t)}{\mathrm{d}t} = r[C(t)]^p \left(1-\left(\dfrac{C(t)}{K} \right)^\alpha \right)
+\end{equaltion}
+
+For both models, $C(t)$ is the cumulative cases, $t$ is the time, $r$ denote the generalized growth rate of the cases, $K$ is the carrying capacity which is the upper asymptote of the pandemic. For the GRM model, $p \in [0,1]$ is introduced to capture the different growth profiles, and $\alpha$ is introduced to measure the deviation from the S-shaped curve of the classic logistic model. It can be seen that GRM reduces to the classic logistic model when $p = 1, \alpha = 1$. Therefore, GRM should be more robust and flexible when the time entered the stage after peak.
+
+In both models, we assume that
+
+- The carrying capacity $K$ is a constant.
+
+- The growth rate of COVID-19 is not affected by age distribution
+
+- The environment factors have no influence on the growth rate.
+
+- The carrying capacity $K$ influence all population equally.
+
+To see that our models are appropriate, we provided some explaination. It is intuitive that an exponential model or a generalized enponential model can be used to describe the cases at the early stage. However, the growth trend will slow down after the turning point and reaches its limit as the growth rate decay, as well as the cumulative cases curve becomes nearly horizontal. In this case, a logistic type model which follows a common sigmoid curve may have better performance. Furthermore, by introducing $p$ and $\alpha$, a more general model, GRM, should play a critical rule in answering our question of interest.
+
+## Fit the model
+
+To see the trend of COVID-19, we fit the models to the global cumulative cases and five countries: United States, United Kingdom, India, Ethiopia and Australia. We used `SSlogis()` and `SSposnegRichards()` functions in `R` to self start to creates initial estimates of the parameters. Then we use `nls()` i.e. Nonlinear Least Squares to determine the NLS estimates of the models. The results are shown in the figure.
+
+```{r include=FALSE}
+trend_plot <- function(country) {
+    clm <- nls(Cumulative_cases ~ SSlogis(Date_num, phi1, phi2, phi3), data = country)
+    alpha <- coef(clm)
+    modpar(country$Date_num, country$Cumulative_cases, verbose = T,
+           force4par = T, suppress.text = T, pn.options = "myoptions", width.bounds = 100)
+    grm <- nls(Cumulative_cases ~ SSposnegRichards(Date_num, Asym = Asym, K = K, 
+                                                   Infl = Infl, M = M, 
+                                                   pn.options = "myoptions", modno = 12),
+               data = country)
+    beta <- coef(grm)
+    
+    f1 <- function(x) alpha[1]/(1 + exp(-(x - alpha[2])/alpha[3]))
+    f2 <- function(x) posnegRichards.eqn(x, Asym = beta[1], K = beta[2], Infl = beta[3], 
+                                         M = beta[4], pn.options = "myoptions", modno = 12)
+    
+    country_name <- country$Country[1]
+    
+    plot_country <- ggplot(country, aes(x = Date_num, y = Cumulative_cases)) +
+        geom_point() + geom_line() +
+        geom_function(aes(colour = "CLM"), size = 1.5, fun = f1) + 
+        geom_function(aes(colour = "GRM"), size = 1.5, fun = f2) + 
+        theme(legend.position = c(0.9, 0.1)) + 
+        labs(x = "Day number", y = "Cumulative cases", 
+             title = paste("COVID trend in", country_name))
+    
+    return(plot_country)
+}
+
+covid_global <- covid %>% group_by(Date_reported) %>%
+    summarise(across(where(is.numeric), sum))
+covid_global <- covid_global %>% mutate(
+    Date_num = as.numeric(difftime(Date_reported, Date_reported[1], units = "days")))
+covid_global <- head(covid_global, -1)
+global_plot <- trend_plot(covid_global)
+global_plot$labels$title <- "COVID trend in the world"
+
+covid_us <- covid %>% filter(Country_code == "US")
+covid_us <- covid_us %>% mutate(
+    Date_num = as.numeric(difftime(Date_reported, Date_reported[1], units = "days")))
+us_plot <- trend_plot(covid_us)
+
+covid_gb <- covid %>% filter(Country_code == "GB")
+covid_gb <- covid_gb %>% mutate(
+    Date_num = as.numeric(difftime(Date_reported, Date_reported[1], units = "days")))
+gb_plot <- trend_plot(covid_gb)
+
+covid_in <- covid %>% filter(Country == "India")
+covid_in <- covid_in %>% mutate(
+    Date_num = as.numeric(difftime(Date_reported, Date_reported[1], units = "days")))
+in_plot <- trend_plot(covid_in)
+
+covid_et <- covid %>% filter(Country == "Ethiopia")
+covid_et <- covid_et %>% mutate(
+    Date_num = as.numeric(difftime(Date_reported, Date_reported[1], units = "days")))
+covid_et <- head(covid_et, -1)
+et_plot <- trend_plot(covid_et)
+
+covid_au <- covid %>% filter(Country == "Australia")
+covid_au <- covid_au %>% mutate(
+    Date_num = as.numeric(difftime(Date_reported, Date_reported[1], units = "days")))
+covid_au <- head(covid_au, -1)
+au_plot <- trend_plot(covid_au)
+
+fig <- grid.arrange(global_plot, us_plot, gb_plot, in_plot, et_plot, au_plot,
+             nrow = 2)
+```
+
+
+```{r trendplot, fig.height=5, fig.width=15}
+grid.arrange(fig)
+```
+
+
+# Causal Inference
+
+Since the growth models do not involve any predictor variable, we will not be able to make causal inference in the growth models part.
+
+
+
+# Model Diagnostics and Sensitivity Analysis
+
+The growth models assume there is a single turning point and a peak. When the time passes the turning point, the new cases should be less and less. However, in reality, due to the strong infectious ability of COVID-19, it seems to have multiple peaks in many countries. Thus our models may not satisfy this assumption. 
+
+The two models are sensitive to the given data. For instance, we tried to fit the two models to the cumulative cases in China, South Africa and Brazil, but the algorithms we chose were not able to converge for these country. This happened might because the cases trend in these countries deviated a lot from the S-shaped curves. The plot proved our thought.
+
+```{r, fig.height=2.5}
+covid_cn <- covid %>% filter(Country_code == "CN")
+covid_cn <- covid_cn %>% mutate(
+    Date_num = as.numeric(difftime(Date_reported, Date_reported[1], units = "days")))
+cn_plot <- ggplot(covid_cn, aes(x = Date_num, y = Cumulative_cases)) + 
+    geom_point() + geom_line() + 
+    labs(x = "Day number", y = "Cumulative cases", 
+        title = "Trend in China")
+
+covid_za <- covid %>% filter(Country == "South Africa")
+covid_za <- covid_za %>% mutate(
+    Date_num = as.numeric(difftime(Date_reported, Date_reported[1], units = "days")))
+za_plot <- ggplot(covid_za, aes(x = Date_num, y = Cumulative_cases)) + 
+    geom_point() + geom_line() + 
+    labs(x = "Day number", y = "Cumulative cases", 
+        title = "Trend in South Africa")
+
+covid_br <- covid %>% filter(Country == "Brazil")
+covid_br <- covid_br %>% mutate(
+    Date_num = as.numeric(difftime(Date_reported, Date_reported[1], units = "days")))
+br_plot <- ggplot(covid_br, aes(x = Date_num, y = Cumulative_cases)) + 
+    geom_point() + geom_line() + 
+    labs(x = "Day number", y = "Cumulative cases", 
+        title = "Trend in Brazil")
+
+grid.arrange(cn_plot, za_plot, br_plot, 
+             nrow = 1)
+```
+
+# Conclusion
+
+In this project, we explored the development trend of cumulative cases of COVID-19. As a general method to model the growth of population, we chose two logistic type of models to fit the data. The results showed that our models are able to describe the trend in some countries. One limitation of our analysis is that the model is not robust enought and is sensitive to the data. Another caveat is that our assumption for the development trend of COVID-19 is very easy compared to the reality. In the future research, more practical models including time-series models and deep learning models are expected to use.
+
+# Contribution {-}
+
+- Jiongqi Zhao:
+- Jiawen Liu:
+- Zhongxuan Liu: Growth Models, Model diagnostics, Code and Format Integration
+- Chenze Li: 
+
+# Acknowledgement {-}
+
+We would like to express my gratitude and thanks to our classmates, instructor and TA. We would also like to thank our families and friends who encouraged and supported us in finishing this project. We are very grateful to each of our teammates as well, as it is a pleasure to work with each other as a team and we learned a lot from each other.
+
+# Supplementary Material {-}
+
+The github link for our source code is provided for the reproducibility: https://github.com/ZhongxuanLiu/STA207Project3
+
+
+# Reference {-}
+
+1. https://en.wikipedia.org/wiki/Coronavirus_disease_2019
+
+2. https://www.sciencedirect.com/science/article/pii/S2468042720300270
+
+3. https://www.bsg.ox.ac.uk/research/research-projects/covid-19-government-response-tracker
+
+4. https://canvas.ucdavis.edu/courses/522279/files/11759664?wrap=1
+
+
+# Session info {-}
+
+```{r}
+sessionInfo()
+```
+
