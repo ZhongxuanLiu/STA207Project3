@@ -46,19 +46,19 @@ covid_re<-mutate(covid_re,Days_2021 = Date_reported- as.Date("2020-01-03"))
 
 axis1=list(
 title = "New Case",
-autorange = F,                           # 是否自动设置坐标轴范围，可取值 : TRUE , FALSE , "reversed"
-rangemode = "normal",                        # 坐标轴范围模式 : "normal" , "tozero" , "nonnegative"
-range = c(0,400000),                              # 设置坐标轴范围
-fixedrange = TRUE,                           # 设置坐标轴是否可以缩放
-tickmode = "auto",                           # 刻度线类型："auto" | "linear" | "array"
+autorange = F,                          
+rangemode = "normal",                        
+range = c(0,400000),                             
+fixedrange = TRUE,                           
+tickmode = "auto",                           
 nticks = 4)
 axis2=list(
   title = "New Death",
-autorange = F,                           # 是否自动设置坐标轴范围，可取值 : TRUE , FALSE , "reversed"
-rangemode = "normal",                        # 坐标轴范围模式 : "normal" , "tozero" , "nonnegative"
-range = c(0,8000),                              # 设置坐标轴范围
-fixedrange = TRUE,                           # 设置坐标轴是否可以缩放
-tickmode = "auto",                           # 刻度线类型："auto" | "linear" | "array"
+autorange = F,                          
+rangemode = "normal",                      
+range = c(0,8000),                            
+fixedrange = TRUE,                         
+tickmode = "auto",                          
 nticks = 4)
 fig<-plot_ly(data=covid_re,x=~new_case,y=~new_death,frame=~Days_2021,text=~WHO_region,color=~WHO_region,alpha=0.7,type="scatter",showlegend = T,hoverinfo="WHO_region",mode = 'markers')%>%layout(xaxis=axis1,yaxis=axis2)
 fig
