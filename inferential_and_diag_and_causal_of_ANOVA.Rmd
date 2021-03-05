@@ -1,0 +1,106 @@
+---
+title: "inferential, diagnostics, and causal of ANOVA"
+author: "Jiongqi Zhao"
+date: "3/5/2021"
+output: html_document
+---
+## Inference Analysis
+
+We use a two-way ANOVA model for the first question of interest. The interaction term of the full model is not significant, therefore we drop it and are left with an additive model.
+$$Y_{ijk} = \mu_{\cdot\cdot} + \alpha_i+\beta_j +\epsilon_{ijk}$$, where the total number of observations is k = 1,..., 40, the lockdown status are i = 0 (no lockdown), 1 (lockdown), and j's denote the 106 country codes. The constraints are (i)$\sum\alpha_i=0$, (ii)$\sum\beta_j=0$, (iii)$\epsilon_{ijk}$ follows $N(0,\sigma^2)$.
+The model assumptions are that the residuals follow a normal distribution and have equal variances.
+
+```{r}
+covid <- read_csv("https://covid19.who.int/WHO-COVID-19-global-data.csv")
+covid$WHO_region<-as.factor(covid$WHO_region)
+```
+
+
+```{r}
+#causal inference
+data3<-read_csv("C:/Users/Jiongqi/Desktop/winter2021/207/project/data_c.csv",col_names = T)
+data3f<-read_csv("C:/Users/Jiongqi/Desktop/winter2021/207/project/data_c1.csv",col_names = T)
+colnames(data3f)[1]<-"country_code"
+colnames(data3)[1]<-"country_code"
+sumn<-function(x){
+  return (sum(x,na.rm=T))
+}
+data3f$days<-apply(data3f[,3:431],1,sumn)
+pos<-function(x){
+  return (which(x==2))
+}
+data3_pos<-apply(data3[,3:431],1,pos)
+names(data3_pos)<-1:186
+data3_pos1<-sapply(data3_pos,length)
+data3_pos1<-data3_pos1[which(data3_pos1>=22)]
+data3_pos<-data3[as.integer(names(data3_pos1)),]
+posq<-function(x){
+  return (which(x==2)[1])
+}
+pos1<-apply(data3_pos[,3:431],1,posq)
+date<-colnames(data3_pos)[pos1]
+Sys.setlocale("LC_TIME", "C")
+date<-as.Date(date,"%d-%b-%y")
+date<-data.frame(country_code=data3_pos$country_code,date=date)
+library(countrycode)
+library(ISOcodes)
+covid_<-covid
+covid_$country_code<-countrycode(covid$Country,origin = "country.name",destination = "iso3c",warn = TRUE)
+c<-c(integer(0))
+for (i in 1:153){
+  c<-c(c,which(covid_$country_code==data3_pos$country_code[i]))
+  
+}
+covid_<-covid_[c,]
+newd<-inner_join(covid_, data3_pos, by = "country_code")
+newd<-inner_join(newd,date, by = "country_code")
+newd<-newd[,c(1:10,440)]
+day<-newd[seq(1,64904,by=427),]$date
+code<-unique(newd$country_code)
+data4<-data.frame(integer(0))
+for (i in 1:152){
+covid_temp<-filter(newd,country_code==code[i])
+covid_temp_un<-filter(covid_temp,as.Date(day[i])-10<=Date_reported,Date_reported<=day[i])
+covid_temp_lo<-filter(covid_temp,day[i]<=Date_reported,Date_reported<=as.Date(day[i])+10)
+covid_temp_un$rate<-c(NA,covid_temp_un$New_cases[2:11]/covid_temp_un$Cumulative_cases[1:10])
+covid_temp_lo$rate<-c(NA,covid_temp_lo$New_cases[2:11]/covid_temp_lo$Cumulative_cases[1:10])
+covid_temp_un$status<-rep(0,11)
+covid_temp_lo$status<-rep(1,11)
+temp1<-as.data.frame(rbind(covid_temp_un[2:11,],covid_temp_lo[2:11,]))
+data4<-as.data.frame(rbind(data4,temp1))
+}
+```
+
+```{r}
+pos2<-which(data4$rate==NaN|data4$rate==Inf)
+data4<-filter(data4,!(country_code%in%unique(data4$country_code[pos2])))
+data4$status<-as.factor(data4$status)
+data4$country_code<-as.factor(data4$country_code)
+full<-aov(rate~status+country_code+status:country_code,data=data4)
+summary(full)#interaction not significant, remove it
+fit3<-aov(rate~status+country_code,data=data4)
+summary(fit3)
+```
+At significance level 0.05, the main effects country and lockdown status are significant, meaning there exists differences in rate of increasing cases between different lockdown status and between different countries, since their p-values < 0.05. 
+
+## Model Diagnostics
+
+```{r}
+plot(fit3, which=c(1,2,3,6))
+```
+The fitted vs. residuals plot indicates unequal spread over the horizontal line, therefore the equal-variance assumption is violated. The normal qq-plot shows departure from the normality line, violating the normality assumption.
+
+## Causal Interpretation
+
+The ANOVA model indicates that there is a strong association between the increasing rate of COVID-19 and countries and lockdown status. But associations do not mean causality, because there is selection bias in observational studies where treatment group and comparison groups are not randomly assigned. In order to remove the bias, we utilized the propensity score (the conditional probability of treatment given background variables (excluding the response)) as weights in our ANOVA model. First we built a selection model (fit4), which is a logistic model as mentioned in Discussion 6. Then we got the p-scores by the fitted values of fit4. Weights are 1/p-scores. 
+```{r}
+data4$status = relevel(data4$status,ref='0')
+fit4 = glm(status~country_code,family = binomial,data = data4)
+prob = fit4$fitted.values
+pscore = ifelse(data4$rate=='1',prob,(1-prob))
+weight = 1/pscore
+model_new1= aov(rate~status+country_code,data = data4,weights = weight)
+summary(model_new1)
+```
+
+After balancing, we got a weighted model (model_new1), where the p-values of both status and country_code are < 0.05, indicating that there exists causality between the increasing rate of COVID-19 and the predictors at the 0.05 significance level. In other words, lockdown status and different countries can cause the change of the increase rate of COVID-19.
