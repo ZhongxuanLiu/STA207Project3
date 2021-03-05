@@ -1,0 +1,100 @@
+---
+title: "Untitled"
+author: "Chenze-Li"
+date: "2021/3/5"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+covid <- read_csv("https://covid19.who.int/WHO-COVID-19-global-data.csv")
+covid$WHO_region<-as.factor(covid$WHO_region)
+#region<-group_by(covid,WHO_region,Date_reported)
+data<-filter(covid,Date_reported=="2021-02-26")
+region<-group_by(data,WHO_region)
+datar<-summarise(region,mean_new=mean(New_cases),mean_cu=mean(Cumulative_cases),mean_de=mean(New_deaths),mean_desum=mean(Cumulative_deaths))
+
+library(ggplot2)
+library(dplyr)
+library(countrycode)
+library(ISOcodes)
+require(maps)
+require(viridis)
+theme_set(
+  theme_void()
+)
+```
+
+```{r}
+world_map2<-map_data("world")
+
+# data$isoa2<-data$Country_code
+world_map2$isoa2<-countrycode(world_map2$region,origin = "country.name",destination = "iso2c",warn = TRUE)
+data$isoa2<-countrycode(data$Country,origin = "country.name",destination = "iso2c",warn = TRUE)
+
+temp<-unique(world_map2$isoa2)
+pos1<-c(numeric(0))
+for (i in 1:length(data$isoa2)){
+  pos1<-c(pos1,which(temp==data$isoa2[i]))
+}
+
+
+library(plotly)
+covid_re<-group_by(covid,Date_reported,WHO_region)
+covid_re<-summarise(covid_re,new_case=sum(New_cases),new_death=sum(New_deaths),death_rate=sum(Cumulative_deaths)/sum(Cumulative_cases))
+covid_re<-mutate(covid_re,Days_2021 = Date_reported- as.Date("2020-01-03"))
+
+axis1=list(
+title = "New Case",
+autorange = F,                           # 是否自动设置坐标轴范围，可取值 : TRUE , FALSE , "reversed"
+rangemode = "normal",                        # 坐标轴范围模式 : "normal" , "tozero" , "nonnegative"
+range = c(0,400000),                              # 设置坐标轴范围
+fixedrange = TRUE,                           # 设置坐标轴是否可以缩放
+tickmode = "auto",                           # 刻度线类型："auto" | "linear" | "array"
+nticks = 4)
+axis2=list(
+  title = "New Death",
+autorange = F,                           # 是否自动设置坐标轴范围，可取值 : TRUE , FALSE , "reversed"
+rangemode = "normal",                        # 坐标轴范围模式 : "normal" , "tozero" , "nonnegative"
+range = c(0,8000),                              # 设置坐标轴范围
+fixedrange = TRUE,                           # 设置坐标轴是否可以缩放
+tickmode = "auto",                           # 刻度线类型："auto" | "linear" | "array"
+nticks = 4)
+fig<-plot_ly(data=covid_re,x=~new_case,y=~new_death,frame=~Days_2021,text=~WHO_region,color=~WHO_region,alpha=0.7,type="scatter",showlegend = T,hoverinfo="WHO_region",mode = 'markers')%>%layout(xaxis=axis1,yaxis=axis2)
+fig
+```
+
+
+```{r}
+#interactive plot
+library(echarts4r)
+covid_es<-filter(covid,Date_reported>= "2021-01-03", Date_reported<= "2021-02-28")
+covid_es$isoa2<-countrycode(covid_es$Country,origin = "country.name",destination = "country.name",warn = TRUE)
+covid_es <- covid_es %>%
+mutate(Name = recode_factor(isoa2,
+                            `Congo - Kinshasa`= "Dem. Rep. Congo",
+                            `Congo - Brazzaville`= "Congo",
+                            `Cote d'Ivoire`= "C??te d'Ivoire",
+                            `Central African Republic`= "Central African Rep.",
+                            `Yemen, Rep.`= "Yemen",
+                            `Korea, Rep.`= "Korea",
+                            `Korea, Dem. Rep.`= "Dem. Rep. Korea",
+                            `Czech Republic`= "Czech Rep.",
+                            `Slovak Republic`= "Slovakia",
+                            `Dominican Republic`= "Dominican Rep.",
+                            `Equatorial Guinea`= "Eq. Guinea",
+                            `South Sudan`="S.Sudan",
+                            `Myanmar (Burma)`="Myanmar"))
+ covid_es%>%
+  group_by(Date_reported) %>%
+  e_chart(Name, timeline = TRUE) %>%
+  e_map(New_cases) %>%
+  e_visual_map(min=0,max=170000,type = 'continuous') %>%
+  e_title("New Cases of Covid-19 by Country and Day", left = "center") %>%
+  e_tooltip(
+    trigger = "item",
+    formatter = e_tooltip_choro_formatter())
+
+ 
+```
+
