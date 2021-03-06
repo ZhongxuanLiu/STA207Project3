@@ -41,7 +41,7 @@ In late December of 2019, a contagious Coronavirus disease 2019 (COVID-19) cause
 
 # Descriptive Analysis
 First, we would like to show how the daily cases and daily deaths of covid-19 change with WHO regions and dates.
-```{r}
+```{r,include=F}
 library(tidyverse)
 covid <- read_csv("https://covid19.who.int/WHO-COVID-19-global-data.csv")
 covid$WHO_region<-as.factor(covid$WHO_region)
@@ -60,7 +60,7 @@ theme_set(
 )
 ```
 
-```{r}
+```{r,fig.align = "center",echo=F}
 world_map2<-map_data("world")
 # data$isoa2<-data$Country_code
 world_map2$isoa2<-countrycode(world_map2$region,origin = "country.name",destination = "iso2c",warn = TRUE)
@@ -95,7 +95,7 @@ fig
 ```
 Then we show how the daily cases of covid-19 change with countries and dates:
 
-```{r}
+```{r,echo=F,fig.align = "center"}
 #interactive plot
 library(echarts4r)
 covid_es<-filter(covid,Date_reported>= "2021-01-03", Date_reported<= "2021-02-28")
