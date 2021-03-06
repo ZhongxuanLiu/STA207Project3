@@ -40,6 +40,92 @@ In late December of 2019, a contagious Coronavirus disease 2019 (COVID-19) cause
 
 
 # Descriptive Analysis
+First, we would like to show how the daily cases and daily deaths of covid-19 change with WHO regions and dates.
+```{r}
+library(tidyverse)
+covid <- read_csv("https://covid19.who.int/WHO-COVID-19-global-data.csv")
+covid$WHO_region<-as.factor(covid$WHO_region)
+#region<-group_by(covid,WHO_region,Date_reported)
+data<-filter(covid,Date_reported=="2021-02-26")
+region<-group_by(data,WHO_region)
+datar<-summarise(region,mean_new=mean(New_cases),mean_cu=mean(Cumulative_cases),mean_de=mean(New_deaths),mean_desum=mean(Cumulative_deaths))
+library(ggplot2)
+library(dplyr)
+library(countrycode)
+library(ISOcodes)
+require(maps)
+require(viridis)
+theme_set(
+  theme_void()
+)
+```
+
+```{r}
+world_map2<-map_data("world")
+# data$isoa2<-data$Country_code
+world_map2$isoa2<-countrycode(world_map2$region,origin = "country.name",destination = "iso2c",warn = TRUE)
+data$isoa2<-countrycode(data$Country,origin = "country.name",destination = "iso2c",warn = TRUE)
+temp<-unique(world_map2$isoa2)
+pos1<-c(numeric(0))
+for (i in 1:length(data$isoa2)){
+  pos1<-c(pos1,which(temp==data$isoa2[i]))
+}
+library(plotly)
+covid_re<-group_by(covid,Date_reported,WHO_region)
+covid_re<-summarise(covid_re,new_case=sum(New_cases),new_death=sum(New_deaths),death_rate=sum(Cumulative_deaths)/sum(Cumulative_cases))
+covid_re<-mutate(covid_re,Days_2021 = Date_reported- as.Date("2020-01-03"))
+axis1=list(
+title = "New Case",
+autorange = F,                          
+rangemode = "normal",                        
+range = c(0,400000),                             
+fixedrange = TRUE,                           
+tickmode = "auto",                           
+nticks = 4)
+axis2=list(
+  title = "New Death",
+autorange = F,                          
+rangemode = "normal",                      
+range = c(0,8000),                            
+fixedrange = TRUE,                         
+tickmode = "auto",                          
+nticks = 4)
+fig<-plot_ly(data=covid_re,x=~new_case,y=~new_death,frame=~Days_2021,text=~WHO_region,color=~WHO_region,alpha=0.7,type="scatter",showlegend = T,hoverinfo="WHO_region",mode = 'markers')%>%layout(xaxis=axis1,yaxis=axis2)
+fig
+```
+Then we show how the daily cases of covid-19 change with countries and dates:
+
+```{r}
+#interactive plot
+library(echarts4r)
+covid_es<-filter(covid,Date_reported>= "2021-01-03", Date_reported<= "2021-02-28")
+covid_es$isoa2<-countrycode(covid_es$Country,origin = "country.name",destination = "country.name",warn = TRUE)
+covid_es <- covid_es %>%
+mutate(Name = recode_factor(isoa2,
+                            `Congo - Kinshasa`= "Dem. Rep. Congo",
+                            `Congo - Brazzaville`= "Congo",
+                            `Cote d'Ivoire`= "C??te d'Ivoire",
+                            `Central African Republic`= "Central African Rep.",
+                            `Yemen, Rep.`= "Yemen",
+                            `Korea, Rep.`= "Korea",
+                            `Korea, Dem. Rep.`= "Dem. Rep. Korea",
+                            `Czech Republic`= "Czech Rep.",
+                            `Slovak Republic`= "Slovakia",
+                            `Dominican Republic`= "Dominican Rep.",
+                            `Equatorial Guinea`= "Eq. Guinea",
+                            `South Sudan`="S.Sudan",
+                            `Myanmar (Burma)`="Myanmar"))
+ covid_es%>%
+  group_by(Date_reported) %>%
+  e_chart(Name, timeline = TRUE) %>%
+  e_map(New_cases) %>%
+  e_visual_map(min=0,max=170000,type = 'continuous') %>%
+  e_title("New Cases of Covid-19 by Country and Day", left = "center") %>%
+  e_tooltip(
+    trigger = "item",
+    formatter = e_tooltip_choro_formatter())
+ 
+```
 In this part, we draw two interactive plots of new cases and new deaths by the reported date. These two plots show the trend of new cases and new deaths clearly. The number of new infected persons have peaked around January 2021, same as new deaths. The bar plot is made by WHO_region on new cases. There are total 6 regions in WHO Member States:
 
 | WHO_region   | Whole name |
@@ -52,8 +138,7 @@ In this part, we draw two interactive plots of new cases and new deaths by the r
 | WPRO  | WHO Regional Office for the Western Pacific |
 Other regions that aren't contained in the WHO_region are counted in "Other" group. The rank of new cases by WHO_region are AMRO, EURO, SEARO, EMRO, AFRO, WPRO and Other. Americas has the most people infected across these 6 regions(exclude “Other”). EMRO has the smallest infected people across these 6 regions(exclude “Other”).  
 
-Since we are concentrating on the growth rate in the USA, we also draw an interactive plot of new cases by day. The plot of new cases by day in the USA and the analogous plot of the whole world show the similar trend on new cases. We also take a look at the trend of new cases in China and the UK. The UK has a similar trend as well. However, in China, the number of new cases is high at the beginning, much less new cases were reported after May 2020. The growth rate is extremely high in Feb 2020 and May 2020.
-
+Since we are concentrating on the growth rate in the USA, we also draw an interactive plot of new cases by day. The plot of new cases by day in the USA and the analogous plot of the whole world show the similar trend on new cases. We also take a look at the trend of new cases in China and the UK. The UK has a similar trend as well. However, in China, the number of new cases is high at the beginning, much less new cases were reported after May 2020. 
 
 ```{r}
 # summarise by date
