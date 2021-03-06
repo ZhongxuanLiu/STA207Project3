@@ -90,9 +90,18 @@ plot(fit3, which=c(1,2,3,6))
 ```
 The fitted vs. residuals plot indicates unequal spread over the horizontal line, therefore the equal-variance assumption is violated. The normal qq-plot shows departure from the normality line, violating the normality assumption.
 
+For further analysis and since the distribution of the error terms is heavy-tailed and F test is sensitive to non-normality,I decide to choose Levene test("Levene's test",2020) to check the equal variance assumption.The null hypothesis is $H_0:\{\sigma_{ij}\}_{ij}$ are equal to each other and the alternative hypothesis is $H_a:$ not all $\{\sigma_{ij}\}_{ij}$ are equal, where $\sigma_{ij}$ represents the variance of the increase rate within each cell. And the results of test are shown below:
+
+```{r,echo=FALSE}
+rel<-leveneTest(rate~status+country_code,data=data4)
+kable(rel[1,],align="c",caption = "**Table 11:Levene's Test for Homogeneity of Variance**") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+```
+And from this table, we know we need to reject the null hypothesis at the significant level 0.05 and conclude that variance within each cell is not equal to each other and the equal variance assumption is not satisfied.
+
 ## Causal Interpretation
 
-The ANOVA model indicates that there is a strong association between the increasing rate of COVID-19 and countries and lockdown status. But associations do not mean causality, because there is selection bias in observational studies where treatment group and comparison groups are not randomly assigned. In order to remove the bias, we utilized the propensity score (the conditional probability of treatment given background variables (excluding the response)) as weights in our ANOVA model. First we built a selection model (fit4), which is a logistic model as mentioned in Discussion 6. Then we got the p-scores by the fitted values of fit4. Weights are 1/p-scores. 
+The ANOVA model indicates that there is a strong association between the increasing rate of COVID-19 and countries and lockdown status. But associations do not mean causality, because there is selection bias in observational studies where treatment group and comparison groups are not randomly assigned. In order to remove the bias, we utilized the propensity score (the conditional probability of treatment given background variables (excluding the response)) as weights in our ANOVA model. First we built a selection model (fit4), which is a logistic model as mentioned in Discussion 6. Then we got the propensity scores by the fitted values of fit4. Weights are the inverse of propensity scores. 
 ```{r}
 data4$status = relevel(data4$status,ref='0')
 fit4 = glm(status~country_code,family = binomial,data = data4)
