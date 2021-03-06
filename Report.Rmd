@@ -146,7 +146,7 @@ Then, we collect information on several different common policy responses from [
 $$Y_{ijk} = \mu_{\cdot\cdot} + \alpha_i+\beta_j +\epsilon_{ijk}$$, where the total number of observations is k = 1,..., 40, the lockdown status are i = 0 (no lockdown), 1 (lockdown), and j's denote the 106 country codes. The constraints are (i)$\sum\alpha_i=0$, (ii)$\sum\beta_j=0$, (iii)$\epsilon_{ijk}$ follows $N(0,\sigma^2)$.
 The model assumptions are that the residuals follow a normal distribution and have equal variances.
 
-```{r}
+```{r,include=F}
 covid$WHO_region<-as.factor(covid$WHO_region)
 ```
 
@@ -206,7 +206,7 @@ data4<-as.data.frame(rbind(data4,temp1))
 }
 ```
 
-```{r}
+```{r,include=F}
 pos2<-which(is.nan(data4$rate)|is.infinite(data4$rate))
 data4<-filter(data4,!(country_code%in%unique(data4$country_code[pos2])))
 data4$status<-as.factor(data4$status)
@@ -330,7 +330,18 @@ grid.arrange(fig)
 
 Since the growth models do not involve any predictor variable, we will not be able to make causal inference in the growth models part.
 
+The ANOVA model indicates that there is a strong association between the increasing rate of COVID-19 and countries and lockdown status. But associations do not mean causality, because there is selection bias in observational studies where treatment group and comparison groups are not randomly assigned. In order to remove the bias, we utilized the propensity score (the conditional probability of treatment given background variables (excluding the response)) as weights in our ANOVA model. First we built a selection model (fit4), which is a logistic model as mentioned in Discussion 6. Then we got the propensity scores by the fitted values of fit4. Weights are the inverse of propensity scores. 
+```{r}
+data4$status = relevel(data4$status,ref='0')
+fit4 = glm(status~country_code,family = binomial,data = data4)
+prob = fit4$fitted.values
+pscore = ifelse(data4$rate=='1',prob,(1-prob))
+weight = 1/pscore
+model_new1= aov(rate~status+country_code,data = data4,weights = weight)
+summary(model_new1)
+```
 
+After balancing, we got a weighted model (model_new1), where the p-values of both status and country_code are < 0.05, indicating that there exists causality between the increasing rate of COVID-19 and the predictors at the 0.05 significance level. In other words, lockdown status and different countries can cause the change of the increase rate of COVID-19.
 
 # Model Diagnostics and Sensitivity Analysis
 
@@ -366,17 +377,32 @@ br_plot <- ggplot(covid_br, aes(x = Date_num, y = Cumulative_cases)) +
 grid.arrange(cn_plot, za_plot, br_plot, 
              nrow = 1)
 ```
+The diagnostic of ANOVA model is shown as below:
+```{r}
+plot(fit3, which=c(1,2,3,6))
+```
+The fitted vs. residuals plot indicates unequal spread over the horizontal line, therefore the equal-variance assumption is violated. The normal qq-plot shows departure from the normality line, violating the normality assumption.
 
+For further analysis and since the distribution of the error terms is heavy-tailed and F test is sensitive to non-normality,I decide to choose Levene test("Levene's test",2020) to check the equal variance assumption.The null hypothesis is $H_0:\{\sigma_{ij}\}_{ij}$ are equal to each other and the alternative hypothesis is $H_a:$ not all $\{\sigma_{ij}\}_{ij}$ are equal, where $\sigma_{ij}$ represents the variance of the increase rate within each cell. And the results of test are shown below:
+
+```{r,echo=FALSE}
+rel<-leveneTest(rate~status+country_code,data=data4)
+kable(rel[1,],align="c",caption = "**Table 11:Levene's Test for Homogeneity of Variance**") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+```
+And from this table, we know we need to reject the null hypothesis at the significant level 0.05 and conclude that variance within each cell is not equal to each other and the equal variance assumption is not satisfied.
 # Conclusion
 
 In this project, we explored the development trend of cumulative cases of COVID-19. As a general method to model the growth of population, we chose two logistic type of models to fit the data. The results showed that our models are able to describe the trend in some countries. One limitation of our analysis is that the model is not robust enought and is sensitive to the data. Another caveat is that our assumption for the development trend of COVID-19 is very easy compared to the reality. In the future research, more practical models including time-series models and deep learning models are expected to use.
 
+For the ANOVA model, first we build the two-way ANOVA model and find that there exists differences in rate of increasing cases between different lockdown status and between different countries and with propensity scores as weights, we find that lockdown status and different countries can cause the change of the increase rate of COVID-19.
+
 # Contribution {-}
 
-- Jiongqi Zhao:
+- Jiongqi Zhao: Summmary of Result from ANOVA Model, Model diagnostic and Causal Inference
 - Jiawen Liu:
 - Zhongxuan Liu: Growth Models, Model diagnostics, Code and Format Integration
-- Chenze Li: 
+- Chenze Li: ANOVA Model, Model diagnostic, Code and Causal Inference
 
 # Acknowledgement {-}
 
