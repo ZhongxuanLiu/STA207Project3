@@ -142,30 +142,16 @@ $$
 \frac{New Cases in Day i}{Cumulative Cases in Day i-1}
 $$
 
-
-Then, we collect information on several different common policy responses from [The Oxford COVID-19 Government Response Tracker (OxCGRT)](https://www.bsg.ox.ac.uk/research/research-projects/covid-19-government-response-tracker). In this data, we focus on the date when governments implemented national restrictions on internal movement between cities/regions. And we calculate the increase rate of ten days before and after the date of lockdown to investigate if lockdown could control the increase of cases of covid-19. The two-way ANOVA model is built as below:
-$$Y_{ijk} = \mu_{\cdot\cdot} + \alpha_i+\beta_j +\epsilon_{ijk}$$, where the number of observations in each cell is k = 1,..., 10, the lockdown status are i = 0 (no lockdown), 1 (lockdown), and j's denote the 106 country codes. The constraints are (i)$\sum\alpha_i=0$, (ii)$\sum\beta_j=0$, (iii)$\epsilon_{ijk}$ follows $N(0,\sigma^2)$.
+Then, we collect information on several different common policy responses from [The Oxford COVID-19 Government Response Tracker (OxCGRT)](https://www.bsg.ox.ac.uk/research/research-projects/covid-19-government-response-tracker). In this data, we focus on the date when governments implemented national restrictions on internal movement between cities/regions. And we calculate the increase rate of ten days before and after the date of lockdown to investigate if lockdown could control the increase of cases of covid-19. The interaction term of the full model is not significant, therefore we drop it and are left with an additive model.
+$$Y_{ijk} = \mu_{\cdot\cdot} + \alpha_i+\beta_j +\epsilon_{ijk}$$, where the total number of observations is k = 1,..., 40, the lockdown status are i = 0 (no lockdown), 1 (lockdown), and j's denote the 106 country codes. The constraints are (i)$\sum\alpha_i=0$, (ii)$\sum\beta_j=0$, (iii)$\epsilon_{ijk}$ follows $N(0,\sigma^2)$.
 The model assumptions are that the residuals follow a normal distribution and have equal variances.
 
-Before we conduct further analysis, I need to test if these assumptions hold based on this data set. I shall check if the interaction effect exists or not and will examine if other assumptions of the ANOVA model violate.
-```{r,include=FALSE}
-fit5<-aov(rate~status+country_code+status:country_code,data=data4)
-anova(fit3,fit5)
-```
-I use F test to check for the significance of the interaction term. The null hypothesis is $H_0: (\alpha\beta)_{ij}=0$ and the alternative hypothesis is $H_1$: not all $(\alpha\beta)_{ij}$ are zero. The result of F-test is shown as below:
-|Res.Df |   RSS Df| Sum of Sq |     F|Pr(>F)|
-| ----------- | ----------- |----------- | ----------- |-------- |
- | 1823| 142.07   | | |                
- | 1728| 134.56 95 |   7.5105 |1.0153| 0.4418    
-From the table , we find with the significant level $\theta=0.05$,  the p-value is larger than $\theta$, which indicates I accept the null hypothesis that there is no joint effect of the status of lockdown and countries at the significant level 0.05 and our ANOVA model without interaction is reasonable.
-
-After I build the ANOVA model, it is natural to investigate if there is significant association between increase rates of different status of lockdown. Therefore, the null hypothesis is $H_0:\alpha_0=\alpha_1=0$ and the alternative hypothesis is $H_a$:not all $\alpha$s are zero. And we use F test to check if the null hypothesis holds. The result shows the p-value is $7.92\times 10^{-7}$ which means with the significant level $\theta=0.05$ and the normal distribution assumption,  I reject the null hypothesis that all the $\alpha_i$ are equal and there are differences in increase rate before and after lockdown at the significant level 0.05.
 ```{r}
 covid$WHO_region<-as.factor(covid$WHO_region)
 ```
 
 
-```{r}
+```{r,include=F}
 #causal inference
 data3<-read_csv("data_c.csv",col_names = T)
 data3f<-read_csv("data_c1.csv",col_names = T)
@@ -230,6 +216,7 @@ summary(full)#interaction not significant, remove it
 fit3<-aov(rate~status+country_code,data=data4)
 summary(fit3)
 ```
+At significance level 0.05, the main effects country and lockdown status are significant, meaning there exists differences in rate of increasing cases between different lockdown status and between different countries, since their p-values < 0.05. 
 
 ## Growth Models
 
@@ -237,15 +224,15 @@ To model the relationship of the cumulative cases with time, we proposed two log
 
 - Classic Logistic growing Model (CLM)
 
-\begin{equaltion}
+$$
     \dfrac{\mathrm{d}C(t)}{\mathrm{d}t} = rC(t)\left(1-\dfrac{C(t)}{K} \right)
-\end{equaltion}
+$$
 
 - Generalized Richards model (GRM)
 
-\begin{equaltion}
+$$
     \dfrac{\mathrm{d}C(t)}{\mathrm{d}t} = r[C(t)]^p \left(1-\left(\dfrac{C(t)}{K} \right)^\alpha \right)
-\end{equaltion}
+$$
 
 For both models, $C(t)$ is the cumulative cases, $t$ is the time, $r$ denote the generalized growth rate of the cases, $K$ is the carrying capacity which is the upper asymptote of the pandemic. For the GRM model, $p \in [0,1]$ is introduced to capture the different growth profiles, and $\alpha$ is introduced to measure the deviation from the S-shaped curve of the classic logistic model. It can be seen that GRM reduces to the classic logistic model when $p = 1, \alpha = 1$. Therefore, GRM should be more robust and flexible when the time entered the stage after peak.
 
@@ -261,7 +248,7 @@ In both models, we assume that
 
 To see that our models are appropriate, we provided some explaination. It is intuitive that an exponential model or a generalized enponential model can be used to describe the cases at the early stage. However, the growth trend will slow down after the turning point and reaches its limit as the growth rate decay, as well as the cumulative cases curve becomes nearly horizontal. In this case, a logistic type model which follows a common sigmoid curve may have better performance. Furthermore, by introducing $p$ and $\alpha$, a more general model, GRM, should play a critical rule in answering our question of interest.
 
-## Fit the model
+## Fit the growth models
 
 To see the trend of COVID-19, we fit the models to the global cumulative cases and five countries: United States, United Kingdom, India, Ethiopia and Australia. We used `SSlogis()` and `SSposnegRichards()` functions in `R` to self start to creates initial estimates of the parameters. Then we use `nls()` i.e. Nonlinear Least Squares to determine the NLS estimates of the models. The results are shown in the figure.
 
