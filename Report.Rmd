@@ -41,9 +41,7 @@ In late December of 2019, a contagious Coronavirus disease 2019 (COVID-19) cause
 
 # Descriptive Analysis
 First, we would like to show how the daily cases and daily deaths of covid-19 change with WHO regions and dates.
-```{r,include=F}
-library(tidyverse)
-covid <- read_csv("https://covid19.who.int/WHO-COVID-19-global-data.csv")
+```{r}
 covid$WHO_region<-as.factor(covid$WHO_region)
 #region<-group_by(covid,WHO_region,Date_reported)
 data<-filter(covid,Date_reported=="2021-02-26")
@@ -60,7 +58,7 @@ theme_set(
 )
 ```
 
-```{r,fig.align = "center",echo=F}
+```{r}
 world_map2<-map_data("world")
 # data$isoa2<-data$Country_code
 world_map2$isoa2<-countrycode(world_map2$region,origin = "country.name",destination = "iso2c",warn = TRUE)
@@ -95,7 +93,7 @@ fig
 ```
 Then we show how the daily cases of covid-19 change with countries and dates:
 
-```{r,echo=F,fig.align = "center"}
+```{r}
 #interactive plot
 library(echarts4r)
 covid_es<-filter(covid,Date_reported>= "2021-01-03", Date_reported<= "2021-02-28")
@@ -292,7 +290,7 @@ data4<-as.data.frame(rbind(data4,temp1))
 }
 ```
 
-```{r,include=F}
+```{r}
 pos2<-which(is.nan(data4$rate)|is.infinite(data4$rate))
 data4<-filter(data4,!(country_code%in%unique(data4$country_code[pos2])))
 data4$status<-as.factor(data4$status)
@@ -431,6 +429,21 @@ After balancing, we got a weighted model (model_new1), where the p-values of bot
 
 # Model Diagnostics and Sensitivity Analysis
 
+The diagnostic of ANOVA model is shown as below:
+```{r}
+plot(fit3, which=c(1,2,3,6))
+```
+The fitted vs. residuals plot indicates unequal spread over the horizontal line, therefore the equal-variance assumption is violated. The normal qq-plot shows departure from the normality line, violating the normality assumption.
+
+For further analysis and since the distribution of the error terms is heavy-tailed and F test is sensitive to non-normality,I decide to choose Levene test("Levene's test",2020) to check the equal variance assumption.The null hypothesis is $H_0:\{\sigma_{ij}\}_{ij}$ are equal to each other and the alternative hypothesis is $H_a:$ not all $\{\sigma_{ij}\}_{ij}$ are equal, where $\sigma_{ij}$ represents the variance of the increase rate within each cell. And the results of test are shown below:
+
+```{r,echo=FALSE}
+rel<-leveneTest(rate~status+country_code,data=data4)
+kable(rel[1,],align="c",caption = "**Table 11:Levene's Test for Homogeneity of Variance**") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+```
+And from this table, we know we need to reject the null hypothesis at the significant level 0.05 and conclude that variance within each cell is not equal to each other and the equal variance assumption is not satisfied.
+
 The growth models assume there is a single turning point and a peak. When the time passes the turning point, the new cases should be less and less. However, in reality, due to the strong infectious ability of COVID-19, it seems to have multiple peaks in many countries. Thus our models may not satisfy this assumption. 
 
 The two models are sensitive to the given data. For instance, we tried to fit the two models to the cumulative cases in China, South Africa and Brazil, but the algorithms we chose were not able to converge for these country. This happened might because the cases trend in these countries deviated a lot from the S-shaped curves. The plot proved our thought.
@@ -463,20 +476,7 @@ br_plot <- ggplot(covid_br, aes(x = Date_num, y = Cumulative_cases)) +
 grid.arrange(cn_plot, za_plot, br_plot, 
              nrow = 1)
 ```
-The diagnostic of ANOVA model is shown as below:
-```{r}
-plot(fit3, which=c(1,2,3,6))
-```
-The fitted vs. residuals plot indicates unequal spread over the horizontal line, therefore the equal-variance assumption is violated. The normal qq-plot shows departure from the normality line, violating the normality assumption.
 
-For further analysis and since the distribution of the error terms is heavy-tailed and F test is sensitive to non-normality,I decide to choose Levene test("Levene's test",2020) to check the equal variance assumption.The null hypothesis is $H_0:\{\sigma_{ij}\}_{ij}$ are equal to each other and the alternative hypothesis is $H_a:$ not all $\{\sigma_{ij}\}_{ij}$ are equal, where $\sigma_{ij}$ represents the variance of the increase rate within each cell. And the results of test are shown below:
-
-```{r,echo=FALSE}
-rel<-leveneTest(rate~status+country_code,data=data4)
-kable(rel[1,],align="c",caption = "**Table 11:Levene's Test for Homogeneity of Variance**") %>%
-  kable_styling(bootstrap_options = "striped", full_width = F)
-```
-And from this table, we know we need to reject the null hypothesis at the significant level 0.05 and conclude that variance within each cell is not equal to each other and the equal variance assumption is not satisfied.
 # Conclusion
 
 In this project, we explored the development trend of cumulative cases of COVID-19. As a general method to model the growth of population, we chose two logistic type of models to fit the data. The results showed that our models are able to describe the trend in some countries. One limitation of our analysis is that the model is not robust enought and is sensitive to the data. Another caveat is that our assumption for the development trend of COVID-19 is very easy compared to the reality. In the future research, more practical models including time-series models and deep learning models are expected to use.
@@ -486,7 +486,7 @@ For the ANOVA model, first we build the two-way ANOVA model and find that there 
 # Contribution {-}
 
 - Jiongqi Zhao: Summmary of Result from ANOVA Model, Model diagnostic and Causal Inference
-- Jiawen Liu:
+- Jiawen Liu: Descriptive Analysis, Introduction
 - Zhongxuan Liu: Growth Models, Model diagnostics, Code and Format Integration
 - Chenze Li: ANOVA Model, Model diagnostic, Code and Causal Inference
 
