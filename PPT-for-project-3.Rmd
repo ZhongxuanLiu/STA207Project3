@@ -1,0 +1,219 @@
+---
+title: "Project3-Presentation-Team4"
+author: "Chenze-Li"
+date: "2021/3/15"
+output: ioslides_presentation
+---
+
+
+
+## Growth rate
+
+- Given the fact that new cases and cumulative cases do not have the property of weak-sense stationarity, we found the growth rate, defined as :
+$$
+{\rm Growth\ Rate}=\frac{{\rm New\ cases\ in\ Day\ i}}{{\rm Cumulative\ cases\ in\ Day\ i-1}}
+$$
+has good property of weak-sense stationarity. Therefore, we use this the response variable in the models. 
+
+
+## Autoregression Model(AR Model)
+
+- **Assumption**: Past growth rates have an effect on current growth rate.
+$$Y_t=\beta_0+\sum_{i=1}^{p}\beta_iY_{t-i}+\epsilon_t$$
+where 
+
+$Y_t$ : the growth rate on day $t$;
+
+$\beta_i,i=0,\cdots,p$: parameters;
+
+$\{\epsilon_t\}$(white noise): statistically independent random vector with zero mean and finite variance $\sigma^2$.
+
+
+## Choice of order
+
+- As for the order $p$ of the AR model, we use the plot of PACF to decide the order of the AR model. For each country,if the cutoff of the plot of PACF happens at lag-p, then we use p as its order. And we have: 
+```{r,echo=F}
+k1<-data.frame(Country=c("UK","IN","AU"),order=c(6,1,4))
+library(kableExtra)
+kbl(k1) %>%
+  kable_styling( full_width = F)
+```
+
+
+## Growth Rate of United Kingdom
+
+```{r,include=F}
+library(tidyverse)
+library(lubridate)
+
+covid <- read_csv("https://covid19.who.int/WHO-COVID-19-global-data.csv")
+covid$WHO_region<-as.factor(covid$WHO_region)
+```
+
+
+
+```{r,include=F}
+#causal inference
+library(tidyverse)
+library(lubridate)
+data3<-read_csv("C:/Users/Tony Li/Desktop/project3/data_c.csv",col_names = T)
+data3f<-read_csv("C:/Users/Tony Li/Desktop/project3/data_c1.csv",col_names = T)
+colnames(data3f)[1]<-"country_code"
+colnames(data3)[1]<-"country_code"
+sumn<-function(x){
+  return (sum(x,na.rm=T))
+}
+data3f$days<-apply(data3f[,3:431],1,sumn)
+pos<-function(x){
+  return (which(x==2))
+}
+data3_pos<-apply(data3[,3:431],1,pos)
+names(data3_pos)<-1:186
+
+data3_pos1<-sapply(data3_pos,length)
+data3_pos1<-data3_pos1[which(data3_pos1>=22)]
+data3_pos<-data3[as.integer(names(data3_pos1)),]
+posq<-function(x){
+  return (which(x==2)[1])
+}
+pos1<-apply(data3_pos[,3:431],1,posq)
+date<-colnames(data3_pos)[pos1+2]
+Sys.setlocale("LC_TIME", "C")
+date<-as.Date(date,"%d-%b-%y")
+date<-data.frame(country_code=data3_pos$country_code,date=date)
+library(countrycode)
+library(ISOcodes)
+covid_<-covid
+covid_$country_code<-countrycode(covid$Country,origin = "country.name",destination = "iso3c",warn = TRUE)
+c<-c(integer(0))
+for (i in 1:153){
+  c<-c(c,which(covid_$country_code==data3_pos$country_code[i]))
+  
+}
+
+covid_<-covid_[c,]
+newd<-inner_join(covid_, data3_pos, by = "country_code")
+newd<-inner_join(newd,date, by = "country_code")
+newd<-newd[,c(1:10,440)]
+
+day<-newd[seq(1,64904,by=427),]$date
+code<-unique(newd$country_code)
+
+data4<-data.frame(integer(0))
+
+data41<-data.frame(integer(0))
+n=12
+for (i in 1:152){
+covid_temp<-filter(newd,country_code==code[i])
+
+covid_temp_un<-filter(covid_temp,Date_reported<=date[i])
+covid_temp_lo<-filter(covid_temp,date[i]<=Date_reported,Date_reported<=as.Date(date[i])+n)
+
+covid_temp_un$rate<-c(NA,covid_temp_un$New_cases[2:length(covid_temp_un$New_cases)]/covid_temp_un$Cumulative_cases[1:length(covid_temp_un$New_cases)-1])
+covid_temp_lo$rate<-c(NA,covid_temp_lo$New_cases[2:(n+1)]/covid_temp_lo$Cumulative_cases[1:n])
+covid_temp_un$status<-rep(0,length(covid_temp_un$New_cases))
+covid_temp_lo$status<-rep(1,(n+1))
+
+temp1<-as.data.frame(rbind(covid_temp_un[2:length(covid_temp_un$New_cases),],covid_temp_lo[2:(n+1),]))
+data41<-as.data.frame(rbind(data41,temp1))
+}
+
+#pos21<-which(is.nan(data41$rate)==|data41$rate==Inf)
+#data41<-filter(data41,!(country_code%in%unique(data41$country_code[pos21])))
+
+newdata<-filter(data41,(Country_code%in%c("US","UK","IN","AU","ET")))
+UK<-filter(data41,(Country_code%in%c("GB")))
+IN<-filter(data41,(Country_code%in%c("IN")))
+AU<-filter(data41,(Country_code%in%c("AU")))
+
+
+data<-UK[30:(length(UK$rate)-n),]$rate
+acf(data)
+pacf(data)
+resm4<-arima(data[30:(length(UK$rate)-n)], order=c(6,0,0))
+pred4 <- predict(resm4, n.ahead=n, se.fit=TRUE)
+fdat<-data.frame(new_cases=c(pred4$pred,UK[(length(UK$rate)-n+1):length(UK$rate),]$rate),status=c(rep(0,n),rep(1,n)),Country=rep("UK",(2*n)))
+Box.test(resm4$residuals,type="Ljung")
+
+datain<-IN[30:(length(IN$rate)-n),]$rate
+acf(datain)
+pacf(datain)
+resm4<-arima(datain[30:(length(IN$rate)-n)], order=c(1,0,0))
+pred4 <- predict(resm4, n.ahead=n, se.fit=TRUE)
+fdatin<-data.frame(new_cases=c(pred4$pred,IN[(length(IN$rate)-n+1):length(IN$rate),]$rate),status=c(rep(0,n),rep(1,n)),Country=rep("IN",(2*n)))
+Box.test(resm4$residuals,type="Ljung")
+
+dataau<-AU[24:(length(AU$rate)-n),]$rate
+acf(dataau)
+pacf(dataau)
+resm4<-arima(dataau[24:(length(AU$rate)-n)], order=c(6,0,0))
+pred4 <- predict(resm4, n.ahead=n, se.fit=TRUE)
+fdatau<-data.frame(new_cases=c(pred4$pred,AU[(length(AU$rate)-n+1):length(AU$rate),]$rate),status=c(rep(0,n),rep(1,n)),Country=rep("AU",(2*n)))
+Box.test(resm4$residuals,type="Ljung")
+
+new<-as.data.frame(rbind(fdat,fdatin,fdatau))
+new$Country<-as.factor(new$Country)
+fit1<-aov(new_cases~Country+status+Country:status,data=new)
+fit2<-aov(new_cases~Country+status,data=new)
+anova(fit1,fit2)
+summary(fit1)
+```
+
+```{r,echo=F,fig.align='center'}
+fdat$Date<-UK$Date_reported[(length(UK$rate)-n+1):length(UK$rate)]
+fdat$status<-as.factor(fdat$status)
+levels(fdat$status)<-c("Predicted","Real")
+library(ggplot2)
+ggplot(data = fdat, mapping = aes(x = Date, y = new_cases, linetype = status, colour = status, shape = status,fill=status))+
+geom_line() + 
+  geom_point()+ #绘制线图和点图
+scale_linetype_manual(values = c(1,2))+ #自定义线条类型
+scale_color_manual(values = c('blue','red'))+ #自定义颜色
+scale_shape_manual(values = c(21,23))+ #自定义点形状
+scale_fill_manual(values = c('black','yellow'))+
+  labs(y = "Growth rate",
+                  x = "Date",title="United Kingdom")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Growth Rate of Australia
+
+```{r,echo=F,fig.align='center'}
+fdatau$Date<-AU$Date_reported[(length(AU$rate)-n+1):length(AU$rate)]
+fdatau$status<-as.factor(fdatau$status)
+levels(fdatau$status)<-c("Predicted","Real")
+library(ggplot2)
+ggplot(data = fdatau, mapping = aes(x = Date, y = new_cases, linetype = status, colour = status, shape = status,fill=status))+
+geom_line() + 
+  geom_point()+ #绘制线图和点图
+scale_linetype_manual(values = c(1,2))+ #自定义线条类型
+scale_color_manual(values = c('blue','red'))+ #自定义颜色
+scale_shape_manual(values = c(21,23))+ #自定义点形状
+scale_fill_manual(values = c('black','yellow'))+
+  labs(y = "Growth rate",
+                  x = "Date",title="Australia")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Growth Rate of India
+
+```{r,echo=F,fig.align='center'}
+fdatin$Date<-IN$Date_reported[(length(IN$rate)-n+1):length(IN$rate)]
+fdatin$status<-as.factor(fdatin$status)
+levels(fdatin$status)<-c("Predicted","Real")
+library(ggplot2)
+ggplot(data = fdatin, mapping = aes(x = Date, y = new_cases, linetype = status, colour = status, shape = status,fill=status))+
+geom_line() + 
+  geom_point()+ #绘制线图和点图
+scale_linetype_manual(values = c(1,2))+ #自定义线条类型
+scale_color_manual(values = c('blue','red'))+ #自定义颜色
+scale_shape_manual(values = c(21,23))+ #自定义点形状
+scale_fill_manual(values = c('black','yellow'))+
+  labs(y = "Growth rate",
+                  x = "Date",title="India")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+
