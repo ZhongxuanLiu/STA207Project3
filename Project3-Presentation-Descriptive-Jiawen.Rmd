@@ -1,0 +1,261 @@
+---
+title: "Statistical Data Analysis On WHO Covid-19 data"
+author: "Team 4: Jiawen Liu, Jiongqi Zhao, Zhongxuan Liu, Chenze Li"
+date: "3/14/2021"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Descriptive Analysis
+
+## Interactive plot of new cases by time
+
+```{r, message=FALSE}
+library(tidyverse)
+library(plotly)
+library(gplots)
+library(lme4)
+library(data.table)
+library(kableExtra)
+library(lubridate)
+library(hrbrthemes)
+covid <- read_csv("~/Desktop/Courses/UC Davis/2021winter/207/WHO-COVID-19-global-data.csv")
+```
+
+```{r, fig.align='center', message = FALSE}
+# summarise by date
+covid_date <- covid %>% 
+  mutate(avg_new_cases = stats::filter(New_cases, rep(1/7, 7), sides = 1),
+         avg_new_deaths = stats::filter(New_deaths, rep(1/7, 7), sides = 1)) %>% 
+  group_by(Date_reported) %>% 
+  summarise(sum_new_cases = sum(New_cases),
+            sum_new_deaths = sum(New_deaths),
+            sum_avg_new_cases = sum(avg_new_cases),
+            sum_avg_new_deaths = sum(avg_new_deaths))
+p1 <- plot_ly(data = covid_date, x = ~ Date_reported, y = ~ sum_new_cases, type = "bar", name = "new cases")
+add_paths(p1, x = covid_date$Date_reported, y = covid_date$sum_avg_new_cases, name = "7 day average")
+```
+
+
+## Interactive plot of new deaths by time
+
+```{r}
+p2 <- plot_ly(data = covid_date, x = ~ Date_reported, y = ~ sum_new_deaths, type = "bar", name = "new deaths")
+add_paths(p2, x = covid_date$Date_reported, y = covid_date$sum_avg_new_deaths, name = "7 day average")
+```
+
+## The six countries with the most cumulative cases so far
+
+| Country   | Cumulative cases | Cumulative deaths |
+| ----------- | ----------- | ----------- |
+| United States of America  | 29063401   |      528456|
+| Brazil  | 11363380    |     275105|
+| India  | 11359048    |     158607|
+| Russian Federation  | 4390608     |     92090|
+| The United Kingdom | 4253824     |    125464|
+| France  | 3975989    |      89800|
+
+```{r, fig.align='center', message = FALSE}
+covid_country <- covid %>% 
+  group_by(Country) %>% 
+  summarise(sum_new_cases = sum(New_cases),
+            sum_new_deaths = sum(New_deaths)) %>% 
+  arrange(desc(sum_new_cases))
+
+# kable(head(covid_country))
+```
+
+## WHO region defination
+
+| WHO_region   | Whole name |
+| ----------- | ----------- |
+| AFRO  | WHO Regional Office for Africa |
+| AMRO  | WHO Regional Office for the Americas |
+| EMRO  | WHO Regional Office for the Eastern Mediterranean |
+| EURO  | WHO Regional Office for Europe |
+| SEARO | WHO Regional Office for South-East Asia |
+| WPRO  | WHO Regional Office for the Western Pacific |
+
+Reference: https://www.who.int/chp/about/regions/en/
+
+## Bar chart of cumulative cases by WHO region
+
+```{r, message = FALSE}
+covid_region <- covid %>% 
+  group_by(WHO_region) %>% 
+  summarise(sum_new_cases = sum(New_cases),
+            sum_new_deaths = sum(New_deaths))
+
+ggplot(covid_region, aes(x = factor(WHO_region, levels = c("Other", "AFRO", "AMRO", "EMRO",  "EURO", "SEARO", "WPRO")),y=sum_new_cases, fill = WHO_region)) + 
+  geom_bar(stat="identity") + coord_flip() + xlab("WHO_region")
+```
+
+## The world map
+
+```{r, fig.align='center', message=FALSE, fig.height=4, warning=FALSE}
+library(tidyverse)
+covid$WHO_region<-as.factor(covid$WHO_region)
+#region<-group_by(covid,WHO_region,Date_reported)
+data<-filter(covid,Date_reported=="2021-02-26")
+region<-group_by(data,WHO_region)
+datar<-summarise(region,mean_new=mean(New_cases),mean_cu=mean(Cumulative_cases),mean_de=mean(New_deaths),mean_desum=mean(Cumulative_deaths))
+
+library(ggplot2)
+library(dplyr)
+library(countrycode)
+library(ISOcodes)
+require(maps)
+require(viridis)
+theme_set(
+  theme_void()
+)
+#interactive plot
+library(echarts4r)
+# covid_es<-filter(covid,Date_reported>= "2021-01-03", Date_reported<= "2021-02-28")
+covid_es <- covid
+covid_es$isoa2<-countrycode(covid_es$Country,origin = "country.name",destination = "country.name",warn = TRUE)
+covid_es <- covid_es %>%
+mutate(Name = recode_factor(isoa2,
+                            `Congo - Kinshasa`= "Dem. Rep. Congo",
+                            `Congo - Brazzaville`= "Congo",
+                            `Cote d'Ivoire`= "C??te d'Ivoire",
+                            `Central African Republic`= "Central African Rep.",
+                            `Yemen, Rep.`= "Yemen",
+                            `Korea, Rep.`= "Korea",
+                            `Korea, Dem. Rep.`= "Dem. Rep. Korea",
+                            `Czech Republic`= "Czech Rep.",
+                            `Slovak Republic`= "Slovakia",
+                            `Dominican Republic`= "Dominican Rep.",
+                            `Equatorial Guinea`= "Eq. Guinea",
+                            `South Sudan`="S.Sudan",
+                            `Myanmar (Burma)`="Myanmar"))
+ covid_es%>%
+  group_by(Date_reported) %>%
+  e_chart(Name, timeline = TRUE) %>%
+  e_map(New_cases) %>%
+  e_visual_map(min=0,max=170000,type = 'continuous') %>%
+  e_title("New Cases of Covid-19 by Country and Day", left = "center") %>%
+  e_tooltip(
+    trigger = "item",
+    formatter = e_tooltip_choro_formatter())
+```
+
+```{r, fig.align='center', message=FALSE}
+# # 
+# covid_es <- covid
+# covid_es$isoa2<-countrycode(covid_es$Country,origin = "country.name",destination = "country.name",warn = TRUE)
+# covid_es <- covid_es %>%
+# mutate(Name = recode_factor(isoa2,
+#                             `Congo - Kinshasa`= "Dem. Rep. Congo",
+#                             `Congo - Brazzaville`= "Congo",
+#                             `Cote d'Ivoire`= "C??te d'Ivoire",
+#                             `Central African Republic`= "Central African Rep.",
+#                             `Yemen, Rep.`= "Yemen",
+#                             `Korea, Rep.`= "Korea",
+#                             `Korea, Dem. Rep.`= "Dem. Rep. Korea",
+#                             `Czech Republic`= "Czech Rep.",
+#                             `Slovak Republic`= "Slovakia",
+#                             `Dominican Republic`= "Dominican Rep.",
+#                             `Equatorial Guinea`= "Eq. Guinea",
+#                             `South Sudan`="S.Sudan",
+#                             `Myanmar (Burma)`="Myanmar")) %>% 
+#   filter(Country %in% c("United States of America", "The United Kingdom", "India", "Australia", "Ethiopia"))
+#  covid_es%>%
+#   group_by(Date_reported) %>%
+#   e_chart(Name, timeline = TRUE) %>%
+#   e_map(New_cases) %>%
+#   e_visual_map(min=0,max=170000,type = 'continuous') %>%
+#   e_title("New Cases of Covid-19 by Country and Day", left = "center") %>%
+#   e_tooltip(
+#     trigger = "item",
+#     formatter = e_tooltip_choro_formatter())
+```
+
+## Interactive plot of new cases by time of USA, UK
+
+```{r, fig.height=2, message=FALSE}
+# America
+covid <- read_csv("~/Desktop/Courses/UC Davis/2021winter/207/WHO-COVID-19-global-data.csv")
+covid_us <- covid %>% 
+  mutate(avg_new_cases = stats::filter(New_cases, rep(1/7, 7), sides = 1),
+         avg_new_deaths = stats::filter(New_deaths, rep(1/7, 7), sides = 1)) %>% 
+  filter(Country == "United States of America")
+
+p3 <- plot_ly(data = covid_us, x = ~ Date_reported, y = ~ New_cases, type = "bar") %>% layout(title = "US")
+p3
+
+# The United Kingdom
+covid_uk <- covid %>% 
+  mutate(avg_new_cases = stats::filter(New_cases, rep(1/7, 7), sides = 1),
+         avg_new_deaths = stats::filter(New_deaths, rep(1/7, 7), sides = 1)) %>% 
+  filter(Country == "The United Kingdom")
+
+p4 <- plot_ly(data = covid_uk, x = ~ Date_reported, y = ~ New_cases, type = "bar") %>% layout(title = "UK")
+p4
+```
+
+## Interactive plot of new cases by time of India, Australia
+```{r, fig.height=2}
+# India
+covid_in <- covid %>% 
+  mutate(avg_new_cases = stats::filter(New_cases, rep(1/7, 7), sides = 1),
+         avg_new_deaths = stats::filter(New_deaths, rep(1/7, 7), sides = 1)) %>% 
+  filter(Country == "India")
+
+p5 <- plot_ly(data = covid_in, x = ~ Date_reported, y = ~ New_cases, type = "bar") %>% layout(title = "India")
+p5
+
+# Australia
+covid_aus <- covid %>% 
+  mutate(avg_new_cases = stats::filter(New_cases, rep(1/7, 7), sides = 1),
+         avg_new_deaths = stats::filter(New_deaths, rep(1/7, 7), sides = 1)) %>% 
+  filter(Country == "Australia")
+
+p6 <- plot_ly(data = covid_aus, x = ~ Date_reported, y = ~ New_cases, type = "bar") %>% layout(title = "Australia")
+p6
+```
+
+## Interactive plot of new cases by time of Ethiopia
+
+```{r, fig.height=2}
+# Ethiopia
+covid_eth <- covid %>% 
+  mutate(avg_new_cases = stats::filter(New_cases, rep(1/7, 7), sides = 1),
+         avg_new_deaths = stats::filter(New_deaths, rep(1/7, 7), sides = 1)) %>% 
+  filter(Country == "Ethiopia")
+
+p7 <- plot_ly(data = covid_eth, x = ~ Date_reported, y = ~ New_cases, type = "bar") %>% layout(title = "Ethiopia")
+p7
+```
+
+## Growth rate by month
+```{r, message=FALSE}
+covid.growth <- covid %>% 
+  mutate(year = year(Date_reported),
+         month = month(Date_reported)) %>% 
+  group_by(year, month) %>% 
+  summarise(sum_new_cases = sum(New_cases)) %>% 
+  ungroup()
+
+covid.growth.new <- covid.growth %>% 
+  mutate(temp = lag(sum_new_cases, n = 1),
+         Time = paste(year, month, sep = "-"),
+         Time = paste0(Time, "-01"),
+         #temp = ifelse(Time == "2021-1", 19082911, temp),
+         growth_rate = (sum_new_cases-temp)/sum_new_cases,
+         growth_rate = ifelse(is.na(growth_rate), 0, growth_rate))
+
+covid.growth.new$Month <- ymd(covid.growth.new$Time)
+covid.growth.new <- covid.growth.new %>% 
+  filter(Month != "2021-02-01") %>% 
+  filter(Month != "2021-03-01")
+covid.growth.new <- data.frame(covid.growth.new)
+ggplot(covid.growth.new, aes(x = Month, y = growth_rate)) + 
+  geom_line() + xlab("Time") + theme_ipsum() + ggtitle("Monthly growth rate")
+```
+
+一
+
