@@ -1,0 +1,34 @@
+---
+title: "Statistical Data Analysis On WHO Covid-19 data--Discussion Report"
+author: "Team 4: Jiongqi Zhao, Jiawen Liu, Zhongxuan Liu, Chenze Li"
+date: "3/12/2021"
+output: html_document
+---
+
+# Overall impression
+
+A worldwide outbreak of COVID-19 which happened in 2019 cause widespread panic across the whole world. The authors care about the trend of the growth rate and if the lockdown policy has effectively controlled the increasing rate of new cases. In order to find out the answers of our interested questions, they use the dataset from World Health Organization (WHO) to conduct the analysis. The authors conduct two types of models, one of them is two-way ANOVA model and the other is ordinary differential equation model. For the ODE model, they use two forms: Classic Logistic growing model(CLM) and Generalized Richards model(GRM). Based on the results of these two models, they find that lockdown status and different countries do have influence of the COVID-19 increasing rate and they also draw some plots which can show the trend of COVID-19 for 5 different countries(US, UK, India, Ethiopia and Australia) and the whole world. 
+
+Overall, this report is impressive. The authors use ODE which is a brand new model in this course(STA 207), visualization looks nice since they use some interactive plots to show the new cases by time. However, the descriptive analysis looks a little bit hard to connect with the following analysis and they also have some typos in this report. 
+
+# Major comments 
+
+1. The authors say they have two interested questions in the *Introduction* part, but the second one "what the development trend curve of the pandemic looks like" don't even be a question. This purpose of a report should be solve one or couple real questions. They should find some coherence between them and reorganize the sentence. For example, the ANOVA model could be used to check whether the effect of lockdown exists, and if so, the ODE models could illustrate how the effect changes over time.
+
+2. In the *Descriptive Analysis* part, the authors draw some interactive plots which looks nice to get the trend of COVID-19 but makes these plots harder to observe because the ranges are too wide and there are some plots don't have x-axis. The authors draw 7 plots based on different countries(or region) but they don't explain these plots so the readers cannot know why they draw them. They should be more careful to talk about why they draw these plots and what are these plots tell us. 
+
+3. The ANOVA model uses the percentage change of new cases for each day as the response variable and there is no strong reason of why they choose the percentage change of new cases as the response variable instead of new cases or cumulative cases. The authors should give more detailed reasons of why they choose the percentage change of new cases as the response variable. Also, in the *Descriptive Analysis* part, there is no plot involving percentage change of new cases and it is better to include plots concerning about percentage change of new cases.
+
+4. It seems that ANOVA model investigates if the lockdown could control the spread of COVID-19 cases and ODE model predicts the cumulative cases in five countries. These two models have little connections and it seems better to make more connections between two models for instance they could show why they would like to build ODE model after ANOVA model or they could use the predicted data of ODE model to build ANOVA model.
+
+5. The growth models, even though seem appropriate, are applied math models rather than statistics models, since there are no random variables. To make them applicable for statistics use, a common way is to introduce a random variable into the model. Add an error term in the models will do the job.
+
+6. The diagnostics part for the growth models are confusing. The authors failed to rule out other possibility why the model algorithm didn't converge in those three countries. More details should be included so that the readers can understand why it didn't work, for example, the authors could have shown their effort to fix the bug (if exists) and the algorithm still didn't converge.
+
+# Minor comments 
+
+- There are some typos in this report, for instance, "whether the lockdown has effectively controled..." in *Introduction* part, it should be "controlled" not "controled"
+
+- In the section *4.1 ANOVA Model*, there is no space in the formula and it is hard for readers to understand the meaning of the formula. It should include some spaces between words in the formula.
+
+- In the chapter *6 Model Diagnostics and Sensitivity Analysis*, the structure is not clear and somehow chaotic. Since there are two parts of models in the previous chapter, it is natrual to have two sections for each part of models in this chapter.
